@@ -1,6 +1,8 @@
 package com.example.kkrb0;
 
-class Book {
+import java.io.Serializable;
+
+class Book implements Serializable {
     public String cover = null;
 
     public String id = null;

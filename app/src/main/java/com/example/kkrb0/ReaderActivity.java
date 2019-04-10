@@ -7,6 +7,8 @@ import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Base64;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -14,7 +16,16 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-public class ReaderActivity extends AppCompatActivity {
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+
+public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostExecute {
+
+    public String baseURL = "http://10.0.2.2/bookflixapi/books/read.php";
 
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
@@ -49,6 +60,11 @@ public class ReaderActivity extends AppCompatActivity {
 //        Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
 //                        .setAction("Action", null).show();
 
+        String queryParams[] = {
+                "book_id=1"
+        };
+        String preparedURL = getPreparedUrl(queryParams);
+        new HttpRequest(this).execute(preparedURL);
     }
 
 
@@ -72,6 +88,30 @@ public class ReaderActivity extends AppCompatActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onTaskCompleted(String result) {
+        Log.e("RA::onTaskCompleted", result);
+        try {
+            JSONObject jObj = new JSONObject(result);
+            int noOfPages = jObj.getInt("count");
+            JSONObject pdfContents = jObj.getJSONObject("content");
+            JSONArray pdfPages = pdfContents.getJSONArray("1");
+            for (int i = 0; i < pdfPages.length(); ++i) {
+                String pageLength = pdfPages.getJSONObject(i).getString("pageLength");
+                String base64Content = pdfPages.getJSONObject(i).getString("pageData");
+                byte[] data = Base64.decode(base64Content, Base64.DEFAULT);
+                String text = new String(data, StandardCharsets.ISO_8859_1);
+                Log.e("Length Expected " + String.valueOf(i), pageLength);
+                Log.e("Length Received " + String.valueOf(i), String.valueOf(text.length()));
+            }
+        } catch (JSONException e) {
+            Log.e("RA::JSONException", e.getMessage());
+//        } catch (UnsupportedEncodingException e) {
+//            Log.e("RA::UnsupportedEncoding", e.getMessage());
+//        }
+        }
     }
 
     /**
@@ -109,11 +149,30 @@ public class ReaderActivity extends AppCompatActivity {
         }
     }
 
+    public String getPreparedUrl(String queryParams[]) {
+        if (baseURL.length() == 0) {
+            return baseURL;
+        }
+        String separator;
+        String preparedUrl = baseURL;
+        for (int i = 0; i < queryParams.length; ++i) {
+            if (i == 0) {
+                separator = "?";
+            } else {
+                separator = "&";
+            }
+            preparedUrl += separator + queryParams[i];
+        }
+        return preparedUrl;
+    }
+
     /**
      * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
      * one of the sections/tabs/pages.
      */
     public class SectionsPagerAdapter extends FragmentPagerAdapter {
+
+        public ArrayList<String> pdfPages = new ArrayList<>();
 
         public SectionsPagerAdapter(FragmentManager fm) {
             super(fm);

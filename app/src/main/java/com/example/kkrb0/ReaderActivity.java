@@ -1,7 +1,6 @@
 package com.example.kkrb0;
 
 import android.content.Intent;
-import android.graphics.pdf.PdfRenderer;
 import android.os.Bundle;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.Fragment;
@@ -17,7 +16,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+
+import com.github.barteksc.pdfviewer.PDFView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -29,6 +29,8 @@ import java.util.ArrayList;
 public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostExecute {
 
     private Book currentBook = null;
+    private static ArrayList<byte[]> pdfPages = new ArrayList<>();
+    private boolean requestInProgress = false;
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
      * fragments for each of the sections. We use a
@@ -37,7 +39,7 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
      * may be best to switch to a
      * {@link android.support.v4.app.FragmentStatePagerAdapter}.
      */
-    private SectionsPagerAdapter mSectionsPagerAdapter;
+    private SectionsPagerAdapter mSectionsPagerAdapter = null;
 
     /**
      * The {@link ViewPager} that will host the section contents.
@@ -51,27 +53,14 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        // Create the adapter that will return a fragment for each of the three
-        // primary sections of the activity.
-        mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
-
-        // Set up the ViewPager with the sections adapter.
-        mViewPager = findViewById(R.id.container);
-        mViewPager.setAdapter(mSectionsPagerAdapter);
 
         Intent intent = getIntent();
         currentBook = (Book) intent.getSerializableExtra("BOOK");
+        toolbar.setTitle(currentBook.name);
 
-        String urlParams[] = {
-                "mode=read",
-                "book_id=" + currentBook.id,
-                "user_id=1",
-        };
-        String preparedURL = Utils.getPreparedApiUrl(urlParams);
-        new HttpRequest(this).execute(preparedURL);
+        pdfPages.clear();
 
-        Snackbar.make(findViewById(R.id.main_content), preparedURL, Snackbar.LENGTH_LONG)
-                .setAction("Action", null).show();
+        getPdfChunk(0);
     }
 
 
@@ -99,24 +88,18 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
 
     @Override
     public void onTaskCompleted(String result) {
-        Log.e("RA::onTaskCompleted", result);
         try {
             JSONObject jObj = new JSONObject(result);
             int bookPages = jObj.getInt("count");
             JSONObject pdfContents = jObj.getJSONObject("content");
-            JSONArray pdfPages = pdfContents.getJSONArray(currentBook.id);
-            for (int i = 0; i < pdfPages.length(); ++i) {
-                String pageLength = pdfPages.getJSONObject(i).getString("pageLength");
-                String base64Content = pdfPages.getJSONObject(i).getString("pageData");
-                byte[] data = Base64.decode(base64Content, Base64.DEFAULT);
-                String text = new String(data, StandardCharsets.ISO_8859_1);
-                Log.e("Length Expected " + String.valueOf(i), pageLength);
-                Log.e("Length Received " + String.valueOf(i), String.valueOf(text.length()));
-
-//                PdfRenderer pdfRundy = new PdfRenderer(getSeekableFileDescriptor());
-                DialogPDFViewer dpdfViewer = new DialogPDFViewer(this, base64Content, null);
-                dpdfViewer.create();
-                dpdfViewer.show();
+            JSONArray pdfChuck = pdfContents.getJSONArray(currentBook.id);
+            for (int i = 0; i < pdfChuck.length(); ++i) {
+                String pageLength = pdfChuck.getJSONObject(i).getString("pageLength");
+                String base64Content = pdfChuck.getJSONObject(i).getString("pageData");
+                byte[] pageData = Base64.decode(base64Content, Base64.DEFAULT);
+                pdfPages.add(pageData);
+                String text = new String(pageData, StandardCharsets.ISO_8859_1);
+//                Log.e(pageLength, String.valueOf(text.length()));
             }
         } catch (JSONException e) {
             Log.e("RA::JSONException", e.getMessage());
@@ -124,6 +107,46 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
 //            Log.e("RA::UnsupportedEncoding", e.getMessage());
 //        }
         }
+
+        if (mSectionsPagerAdapter == null) {
+            // Create the adapter that will return a fragment for each of the three
+            // primary sections of the activity.
+            mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
+
+            // Set up the ViewPager with the sections adapter.
+            mViewPager = findViewById(R.id.container);
+            mViewPager.setAdapter(mSectionsPagerAdapter);
+
+            mViewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+                public void onPageSelected(int position) {
+                    Log.e("POSITION", String.valueOf(position));
+                    if ((position + 2) > pdfPages.size()) {
+                        getPdfChunk(position);
+                    }
+                }
+            });
+        } else {
+            mSectionsPagerAdapter.notifyDataSetChanged();
+        }
+        requestInProgress = false;
+    }
+
+    public void getPdfChunk(int offset) {
+        if (requestInProgress) {
+            return;
+        }
+        requestInProgress = true;
+        String urlParams[] = {
+                "mode=read",
+                "book_id=" + currentBook.id,
+                "user_id=1",
+                "offset=" + String.valueOf(offset)
+        };
+        String preparedURL = Utils.getPreparedApiUrl(urlParams);
+        new HttpRequest(this).execute(preparedURL);
+
+        Snackbar.make(findViewById(R.id.main_content), preparedURL, Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show();
     }
 
     /**
@@ -134,6 +157,7 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
          * The fragment argument representing the section number for this
          * fragment.
          */
+        private static Integer CURRENT_SECTION = 1;
         private static final String ARG_SECTION_NUMBER = "section_number";
 
         public PlaceholderFragment() {
@@ -144,6 +168,7 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
          * number.
          */
         public static PlaceholderFragment newInstance(int sectionNumber) {
+            CURRENT_SECTION = sectionNumber;
             PlaceholderFragment fragment = new PlaceholderFragment();
             Bundle args = new Bundle();
             args.putInt(ARG_SECTION_NUMBER, sectionNumber);
@@ -155,8 +180,13 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
         public View onCreateView(LayoutInflater inflater, ViewGroup container,
                                  Bundle savedInstanceState) {
             View rootView = inflater.inflate(R.layout.fragment_reader, container, false);
-            TextView textView = rootView.findViewById(R.id.section_label);
-            textView.setText(getString(R.string.section_format, getArguments().getInt(ARG_SECTION_NUMBER)));
+            int sectionNumber = getArguments().getInt(ARG_SECTION_NUMBER);
+
+            if (pdfPages.size() > 0 && pdfPages.size() > (sectionNumber - 1)) {
+                PDFView pdfView = rootView.findViewById(R.id.pdfView);
+                pdfView.fromBytes(pdfPages.get(sectionNumber - 1)).enableAnnotationRendering(true).load();
+            }
+
             return rootView;
         }
     }
@@ -166,8 +196,6 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
      * one of the sections/tabs/pages.
      */
     public class SectionsPagerAdapter extends FragmentPagerAdapter {
-
-        public ArrayList<String> pdfPages = new ArrayList<>();
 
         public SectionsPagerAdapter(FragmentManager fm) {
             super(fm);
@@ -182,8 +210,8 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
 
         @Override
         public int getCount() {
-            // Show 9 total pages.
-            return 9;
+            // Number of pages to show
+            return pdfPages.size();
         }
     }
 }

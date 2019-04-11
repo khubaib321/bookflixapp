@@ -102,4 +102,5 @@
     </string>
     <string name="title_activity_reader">ReaderActivity</string>
     <string name="section_format">Hello World from section: %1$d</string>
+    <string name="app_name_offical">Bookflix</string>
 </resources>

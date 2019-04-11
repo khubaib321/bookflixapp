@@ -4,19 +4,26 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.BottomNavigationView;
 import android.support.design.widget.NavigationView;
+import android.support.design.widget.Snackbar;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.JsonReader;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.GridView;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener {
+        implements NavigationView.OnNavigationItemSelectedListener, AsyncTaskPostExecute {
     private ArrayList<Book> books = new ArrayList<>();
 
     private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener
@@ -48,19 +55,6 @@ public class MainActivity extends AppCompatActivity
         NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        for (int i = 0; i < 18; ++i) {
-            String prefix = String.valueOf(i + 1);
-            Book b = new Book();
-            b.id = prefix;
-            b.name = "Name " + prefix;
-            b.author = "Author " + prefix;
-            b.publisher = "Publisher " + prefix;
-            b.cover = "img" + String.valueOf(i + 1);
-            b.year = "Year " + String.valueOf(2019);
-            b.no_of_pages = "500";
-            books.add(b);
-        }
-
         GridView gridview = findViewById(R.id.gridview);
         gridview.setAdapter(new BooksAdapter(this, books));
         gridview.setOnItemClickListener((parent, view, position, id) -> {
@@ -71,6 +65,15 @@ public class MainActivity extends AppCompatActivity
 
         BottomNavigationView navigation = findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
+
+        String urlParams[] = {
+                "mode=list"
+        };
+        String preparedURL = Utils.getPreparedApiUrl(urlParams);
+        new HttpRequest(this).execute(preparedURL);
+
+        Snackbar.make(findViewById(R.id.main_activity_main_content), preparedURL, Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show();
     }
 
     @Override
@@ -128,5 +131,30 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    @Override
+    public void onTaskCompleted(String result) {
+        try {
+            JSONObject bookInfo = new JSONObject(result);
+            JSONArray foundBooks = bookInfo.getJSONArray("body");
+            for (int i = 0; i < foundBooks.length(); ++i) {
+                JSONObject book = foundBooks.getJSONObject(i);
+                Book b = new Book();
+                b.id = book.getString("id");
+                b.name = book.getString("name");
+                b.year = book.getString("year");
+                b.author = book.getString("author");
+                b.category = book.getString("category");
+                b.publisher = book.getString("publisher");
+                b.description = book.getString("description");
+                b.no_of_pages = book.getString("no_of_pages");
+                b.cover = "img" + String.valueOf(i + 1);
+                books.add(b);
+            }
+
+        } catch (JSONException e) {
+            Log.e("MA::JSONException", e.getMessage());
+        }
     }
 }

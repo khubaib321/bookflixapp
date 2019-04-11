@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center"
+    android:background="@color/colorPrimary"
     android:orientation="vertical">
 
     <FrameLayout
@@ -27,6 +28,7 @@
         android:paddingRight="8dp"
         android:textSize="12sp"
         android:textStyle="bold"
+        android:textColor="@color/colorFont"
         tools:text="The Book Name" />
 
     <TextView
@@ -35,6 +37,7 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:textSize="12sp"
+        android:textColor="@color/colorFont"
         tools:text="The Author" />
 
 </LinearLayout>

@@ -9,6 +9,7 @@ class Book implements Serializable {
     public String name = null;
     public String year = null;
     public String author = null;
+    public String category = null;
     public String publisher = null;
     public String no_of_pages = null;
     public String description = null;

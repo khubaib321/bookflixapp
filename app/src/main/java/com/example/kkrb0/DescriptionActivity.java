@@ -3,11 +3,18 @@ package com.example.kkrb0;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.BottomNavigationView;
+import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.TextView;
 
-public class DescriptionActivity extends AppCompatActivity {
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.Serializable;
+
+public class DescriptionActivity extends AppCompatActivity implements AsyncTaskPostExecute {
 
     private Book currentBook = null;
     private TextView textView = null;
@@ -33,15 +40,23 @@ public class DescriptionActivity extends AppCompatActivity {
         Intent intent = getIntent();
         currentBook = (Book) intent.getSerializableExtra("BOOK");
 
-        this.setBookCover();
-        this.setFieldsData();
+        String urlParams[] = {
+                "mode=view",
+                "book_id=" + currentBook.id
+        };
+        String preparedURL = Utils.getPreparedApiUrl(urlParams);
+        new HttpRequest(this).execute(preparedURL);
 
         BottomNavigationView navigation = findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
+
+        Snackbar.make(findViewById(R.id.description_activity_main_content), preparedURL, Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show();
     }
 
     public void handleReadButtonClick(View target) {
         Intent intent = new Intent(this, ReaderActivity.class);
+        intent.putExtra("BOOK", currentBook);
         startActivity(intent);
     }
 
@@ -51,6 +66,9 @@ public class DescriptionActivity extends AppCompatActivity {
     public void setFieldsData() {
         textView = findViewById(R.id.toolbar_title);
         textView.setText(currentBook.name);
+
+        textView = findViewById(R.id.category_text);
+        textView.setText(currentBook.category);
 
         textView = findViewById(R.id.author_text);
         textView.setText(currentBook.author);
@@ -68,7 +86,23 @@ public class DescriptionActivity extends AppCompatActivity {
         textView.setText(currentBook.description);
     }
 
-    public void setBookCover() {
-    }
+    @Override
+    public void onTaskCompleted(String result) {
+        try {
+            JSONObject bookInfo = new JSONObject(result);
+            JSONObject foundBook = bookInfo.getJSONArray("body").getJSONObject(0);
+            currentBook.id = foundBook.getString("id");
+            currentBook.name = foundBook.getString("name");
+            currentBook.year = foundBook.getString("year");
+            currentBook.author = foundBook.getString("author");
+            currentBook.category = foundBook.getString("category");
+            currentBook.publisher = foundBook.getString("publisher");
+            currentBook.description = foundBook.getString("description");
+            currentBook.no_of_pages = foundBook.getString("no_of_pages");
 
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        setFieldsData();
+    }
 }

@@ -1,6 +1,9 @@
 package com.example.kkrb0;
 
+import android.content.Intent;
+import android.graphics.pdf.PdfRenderer;
 import android.os.Bundle;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
@@ -25,8 +28,7 @@ import java.util.ArrayList;
 
 public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostExecute {
 
-    public String baseURL = "http://10.0.2.2/bookflixapi/books/read.php";
-
+    private Book currentBook = null;
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
      * fragments for each of the sections. We use a
@@ -57,14 +59,19 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
         mViewPager = findViewById(R.id.container);
         mViewPager.setAdapter(mSectionsPagerAdapter);
 
-//        Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                        .setAction("Action", null).show();
+        Intent intent = getIntent();
+        currentBook = (Book) intent.getSerializableExtra("BOOK");
 
-        String queryParams[] = {
-                "book_id=1"
+        String urlParams[] = {
+                "mode=read",
+                "book_id=" + currentBook.id,
+                "user_id=1",
         };
-        String preparedURL = getPreparedUrl(queryParams);
+        String preparedURL = Utils.getPreparedApiUrl(urlParams);
         new HttpRequest(this).execute(preparedURL);
+
+        Snackbar.make(findViewById(R.id.main_content), preparedURL, Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show();
     }
 
 
@@ -95,9 +102,9 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
         Log.e("RA::onTaskCompleted", result);
         try {
             JSONObject jObj = new JSONObject(result);
-            int noOfPages = jObj.getInt("count");
+            int bookPages = jObj.getInt("count");
             JSONObject pdfContents = jObj.getJSONObject("content");
-            JSONArray pdfPages = pdfContents.getJSONArray("1");
+            JSONArray pdfPages = pdfContents.getJSONArray(currentBook.id);
             for (int i = 0; i < pdfPages.length(); ++i) {
                 String pageLength = pdfPages.getJSONObject(i).getString("pageLength");
                 String base64Content = pdfPages.getJSONObject(i).getString("pageData");
@@ -105,6 +112,11 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
                 String text = new String(data, StandardCharsets.ISO_8859_1);
                 Log.e("Length Expected " + String.valueOf(i), pageLength);
                 Log.e("Length Received " + String.valueOf(i), String.valueOf(text.length()));
+
+//                PdfRenderer pdfRundy = new PdfRenderer(getSeekableFileDescriptor());
+                DialogPDFViewer dpdfViewer = new DialogPDFViewer(this, base64Content, null);
+                dpdfViewer.create();
+                dpdfViewer.show();
             }
         } catch (JSONException e) {
             Log.e("RA::JSONException", e.getMessage());
@@ -147,23 +159,6 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
             textView.setText(getString(R.string.section_format, getArguments().getInt(ARG_SECTION_NUMBER)));
             return rootView;
         }
-    }
-
-    public String getPreparedUrl(String queryParams[]) {
-        if (baseURL.length() == 0) {
-            return baseURL;
-        }
-        String separator;
-        String preparedUrl = baseURL;
-        for (int i = 0; i < queryParams.length; ++i) {
-            if (i == 0) {
-                separator = "?";
-            } else {
-                separator = "&";
-            }
-            preparedUrl += separator + queryParams[i];
-        }
-        return preparedUrl;
     }
 
     /**

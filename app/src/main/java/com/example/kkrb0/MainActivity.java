@@ -74,6 +74,8 @@ public class MainActivity extends AppCompatActivity
 
         Snackbar.make(findViewById(R.id.main_activity_main_content), preparedURL, Snackbar.LENGTH_LONG)
                 .setAction("Action", null).show();
+
+
     }
 
     @Override

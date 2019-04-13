@@ -6,7 +6,7 @@
     android:background="@color/colorPrimary"
     android:orientation="vertical">
 
-    <FrameLayout
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content">
 
@@ -16,7 +16,7 @@
             android:layout_height="wrap_content"
             android:scaleType="centerCrop" />
 
-    </FrameLayout>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/textview_book_name"
@@ -26,18 +26,18 @@
         android:paddingLeft="8dp"
         android:paddingTop="4dp"
         android:paddingRight="8dp"
-        android:textSize="12sp"
+        android:textSize="14dp"
         android:textStyle="bold"
         android:textColor="@color/colorFont"
-        tools:text="The Book Name" />
+        tools:text="Book Name" />
 
     <TextView
         android:id="@+id/textview_book_author"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
-        android:textSize="12sp"
+        android:textSize="12dp"
         android:textColor="@color/colorFont"
-        tools:text="The Author" />
+        tools:text="Author" />
 
 </LinearLayout>

@@ -29,9 +29,9 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
             case R.id.navigation_home:
                 finish();
                 return true;
-            case R.id.navigation_dashboard:
+            case R.id.navigation_search:
                 return true;
-            case R.id.navigation_notifications:
+            case R.id.navigation_settings:
                 return true;
         }
         return false;

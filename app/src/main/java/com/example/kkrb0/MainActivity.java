@@ -45,9 +45,12 @@ public class MainActivity extends AppCompatActivity
         switch (item.getItemId()) {
             case R.id.navigation_home:
                 return true;
-            case R.id.navigation_dashboard:
+            case R.id.navigation_search:
+                Intent intent = new Intent(this, SearchActivity.class);
+                intent.putExtra("USER", currentUser);
+                startActivity(intent);
                 return true;
-            case R.id.navigation_notifications:
+            case R.id.navigation_settings:
                 return true;
         }
         return false;
@@ -83,7 +86,7 @@ public class MainActivity extends AppCompatActivity
         navigationView.setNavigationItemSelectedListener(this);
 
         GridView gridview = findViewById(R.id.gridview);
-        gridview.setAdapter(new BooksAdapter(this, books));
+        gridview.setAdapter(new BooksAdapter(this, books, false));
         gridview.setOnItemClickListener((parent, view, position, id) -> {
             Intent intent = new Intent(this, DescriptionActivity.class);
             intent.putExtra("BOOK", books.get(position));
@@ -160,13 +163,8 @@ public class MainActivity extends AppCompatActivity
                 Book b = new Book();
                 b.id = book.getString("id");
                 b.name = book.getString("name");
-                b.year = book.getString("year");
-                b.author = book.getString("author");
-                b.category = book.getString("category");
-                b.publisher = book.getString("publisher");
-                b.description = book.getString("description");
-                b.no_of_pages = book.getString("no_of_pages");
                 b.cover = book.getString("cover");
+                b.author = book.getString("author");
                 books.add(b);
             }
 

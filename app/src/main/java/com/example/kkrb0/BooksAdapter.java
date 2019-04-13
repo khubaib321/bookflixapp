@@ -5,23 +5,27 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
-import android.widget.FrameLayout;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
 
-public class BooksAdapter extends BaseAdapter {
+public class BooksAdapter extends BaseAdapter implements Filterable {
 
-    private final Context mContext;
-    private final ArrayList<Book> books;
+    private boolean lv;
+    private Context mContext;
+    private ArrayList<Book> books;
 
     // 1
-    public BooksAdapter(Context context, ArrayList<Book> books) {
-        this.mContext = context;
-        this.books = books;
+    public BooksAdapter(Context context, ArrayList<Book> _books, Boolean listview) {
+        lv = listview;
+        books = _books;
+        mContext = context;
     }
 
     // 2
@@ -33,7 +37,7 @@ public class BooksAdapter extends BaseAdapter {
     // 3
     @Override
     public long getItemId(int position) {
-        return Integer.valueOf(books.get(position).id);
+        return 0;
     }
 
     // 4
@@ -45,21 +49,32 @@ public class BooksAdapter extends BaseAdapter {
     // 5
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
-        final Book book = this.books.get(position);
+        final Book book = books.get(position);
 
-        // 2
         if (convertView == null) {
             final LayoutInflater layoutInflater = LayoutInflater.from(mContext);
-            convertView = layoutInflater.inflate(R.layout.book_thumb, null);
+            if (lv) {
+                convertView = layoutInflater.inflate(R.layout.listview_items, null);
+            } else {
+                convertView = layoutInflater.inflate(R.layout.book_thumb, null);
+            }
         }
 
-        // 3
         final ImageView imageView = convertView.findViewById(R.id.imageview_cover_art);
         final TextView nameTextView = convertView.findViewById(R.id.textview_book_name);
         final TextView authorTextView = convertView.findViewById(R.id.textview_book_author);
 
-        // 4
-        imageView.setLayoutParams(new FrameLayout.LayoutParams(640, 720));
+        Integer width = 640;
+        Integer height = 720;
+        imageView.setLayoutParams(new LinearLayout.LayoutParams(width, height));
+
+        if (lv) {
+            // different settings if list view
+            width = 320;
+            height = 380;
+            imageView.setLayoutParams(new LinearLayout.LayoutParams(width, height));
+        }
+
         Glide
                 .with(mContext)
                 .load(Utils.geteBookImageUrl(book.cover))
@@ -71,4 +86,13 @@ public class BooksAdapter extends BaseAdapter {
         return convertView;
     }
 
+    @Override
+    public Filter getFilter() {
+        return null;
+    }
+
+    public void refreshList(ArrayList<Book> newBooks) {
+        books = newBooks;
+        notifyDataSetChanged();
+    }
 }

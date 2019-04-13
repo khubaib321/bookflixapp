@@ -2,18 +2,23 @@ package com.example.kkrb0;
 
 public class Utils {
 
+    public static final Integer SEARCH_BOOK = 4;
     public static final Integer READ_BOOK = 1;
     public static final Integer USER_LOGIN = 2;
-    public static final Integer SAVE_PROGRESS = 3;
     private static final Integer ENV_LOCAL = 1;
+    public static final Integer SAVE_PROGRESS = 3;
+
 
     private static String serverEmulator = "10.0.2.2";
     private static String serverLocalhost = "localhost";
     private static String serverProduction = "kitabkhana.com.pk";
+
     private static final Integer ENV_EMULATOR = 2;
     private static final Integer ENV_PRODUCTION = 3;
     private static final Integer CURRENT_ENV = ENV_EMULATOR;
+
     private static String readBookURL = "http://" + getHostname() + "/bookflixapi/books/read.php";
+    private static String searchBookUrl = "http://" + getHostname() + "/bookflixapi/books/search.php";
     private static String userLoginURL = "http://" + getHostname() + "/bookflixapi/users/login.php";
     private static String saveProgressURL = "http://" + getHostname() + "/bookflixapi/users/user_reading.php";
 
@@ -24,6 +29,8 @@ public class Utils {
             return userLoginURL;
         } else if (type == SAVE_PROGRESS) {
             return saveProgressURL;
+        } else if (type == SEARCH_BOOK) {
+            return searchBookUrl;
         } else {
             return "";
         }

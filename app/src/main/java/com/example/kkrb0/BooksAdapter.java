@@ -33,13 +33,13 @@ public class BooksAdapter extends BaseAdapter {
     // 3
     @Override
     public long getItemId(int position) {
-        return 0;
+        return Integer.valueOf(books.get(position).id);
     }
 
     // 4
     @Override
     public Object getItem(int position) {
-        return null;
+        return books.get(position);
     }
 
     // 5
@@ -59,13 +59,10 @@ public class BooksAdapter extends BaseAdapter {
         final TextView authorTextView = convertView.findViewById(R.id.textview_book_author);
 
         // 4
-        String uri = "@drawable/" + book.cover;
-        int imageResource = mContext.getResources().getIdentifier(uri, null, mContext.getPackageName());
-//        Drawable res = mContext.getResources().getDrawable(imageResource);
         imageView.setLayoutParams(new FrameLayout.LayoutParams(640, 720));
         Glide
                 .with(mContext)
-                .load(imageResource)
+                .load(Utils.geteBookImageUrl(book.cover))
                 .fitCenter()
                 .into(imageView);
         nameTextView.setText(book.name);

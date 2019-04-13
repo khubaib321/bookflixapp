@@ -14,7 +14,8 @@ import java.net.URL;
 public class HttpRequest extends AsyncTask<String, Void, String> {
     public static final int READ_TIMEOUT = 15000;
     public static final int CONNECTION_TIMEOUT = 15000;
-    public static String REQUEST_METHOD = "GET";
+    protected static String REQUEST_METHOD = "GET";
+    protected Integer REQUEST_TYPE = 0;
     protected AsyncTaskPostExecute context;
 
     public HttpRequest(AsyncTaskPostExecute _context) {
@@ -69,6 +70,14 @@ public class HttpRequest extends AsyncTask<String, Void, String> {
     @Override
     protected void onPostExecute(String result) {
         super.onPostExecute(result);
-        context.onTaskCompleted(result);
+        context.onTaskCompleted(result, REQUEST_TYPE);
+    }
+
+    public void setRequestType(final Integer type) {
+        REQUEST_TYPE = type;
+    }
+
+    public void setRequestMethod(final String method) {
+        REQUEST_METHOD = method;
     }
 }

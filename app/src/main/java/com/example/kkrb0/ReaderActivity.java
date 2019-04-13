@@ -2,7 +2,6 @@ package com.example.kkrb0;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
@@ -12,8 +11,6 @@ import android.support.v7.widget.Toolbar;
 import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -23,14 +20,18 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedList;
 
 public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostExecute {
 
     private Book currentBook = null;
+    private User currentUser = null;
+    private Integer currentPageIndex = 0;
+    private Integer prevSwipePosition = 0;
     private static ArrayList<byte[]> pdfPages = new ArrayList<>();
     private boolean requestInProgress = false;
+    private LinkedList<HttpRequest> requestQueue = new LinkedList<>();
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
      * fragments for each of the sections. We use a
@@ -54,58 +55,42 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        pdfPages.clear();
+
         Intent intent = getIntent();
         currentBook = (Book) intent.getSerializableExtra("BOOK");
         toolbar.setTitle(currentBook.name);
 
-        pdfPages.clear();
+        currentUser = (User) intent.getSerializableExtra("USER");
 
-        getPdfChunk(0);
-    }
-
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_reader, menu);
-        return true;
+        currentPageIndex = 0;
+        managePdf(currentPageIndex);
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
+    public void onTaskCompleted(String result, Integer requestType) {
+        if (requestType == Utils.READ_BOOK) {
+            handleReadBooksApiResponse(result);
+        } else if (requestType == Utils.SAVE_PROGRESS) {
+            handleSaveProgressApiResponse(result);
         }
-
-        return super.onOptionsItemSelected(item);
+        requestInProgress = false;
     }
 
-    @Override
-    public void onTaskCompleted(String result) {
+    public void handleReadBooksApiResponse(String result) {
         try {
             JSONObject jObj = new JSONObject(result);
             int bookPages = jObj.getInt("count");
+            currentPageIndex = jObj.getInt("page_no") - 1;
             JSONObject pdfContents = jObj.getJSONObject("content");
             JSONArray pdfChuck = pdfContents.getJSONArray(currentBook.id);
             for (int i = 0; i < pdfChuck.length(); ++i) {
-                String pageLength = pdfChuck.getJSONObject(i).getString("pageLength");
                 String base64Content = pdfChuck.getJSONObject(i).getString("pageData");
                 byte[] pageData = Base64.decode(base64Content, Base64.DEFAULT);
                 pdfPages.add(pageData);
-                String text = new String(pageData, StandardCharsets.ISO_8859_1);
-//                Log.e(pageLength, String.valueOf(text.length()));
             }
         } catch (JSONException e) {
             Log.e("RA::JSONException", e.getMessage());
-//        } catch (UnsupportedEncodingException e) {
-//            Log.e("RA::UnsupportedEncoding", e.getMessage());
-//        }
         }
 
         if (mSectionsPagerAdapter == null) {
@@ -119,34 +104,85 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
 
             mViewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
                 public void onPageSelected(int position) {
-                    Log.e("POSITION", String.valueOf(position));
-                    if ((position + 2) > pdfPages.size()) {
-                        getPdfChunk(position);
+                    if (position > prevSwipePosition) {
+                        // only if going to next page
+                        handlePageChange(position);
+                        prevSwipePosition = position;
                     }
                 }
             });
         } else {
             mSectionsPagerAdapter.notifyDataSetChanged();
         }
-        requestInProgress = false;
     }
 
-    public void getPdfChunk(int offset) {
+    public void handleSaveProgressApiResponse(String result) {
+
+    }
+
+    public void handlePageChange(Integer position) {
+        currentPageIndex++; // swiped right so update page index we are pointing to
+        managePdf(position);
+    }
+
+    /**
+     * Handles pdf progress saving and pdf navigation
+     * When called for the first time during activity creation 'position' will be 0 as we need to get
+     * the initial pdf page set. At this time 'currentPageIndex' will also be 0 because it is updated
+     * when initial pdf page set is retrieved in 'getPdfChunk' method and that synchronizes the
+     * 'currentPageIndex' with user's saved progress.
+     *
+     * @param position
+     */
+    public void managePdf(Integer position) {
         if (requestInProgress) {
+            enQueueRequest();
+        } else {
+            getPdfChunk(position);  // Check if close to completing current set of pages and get more
+            saveProgress(currentPageIndex + 1); // +1 because we save page number, not index
+        }
+    }
+
+    public void enQueueRequest() {
+
+    }
+
+    /**
+     * Check if close to completing current set of pages and get more
+     *
+     * @param offset Integer
+     */
+    public void getPdfChunk(Integer offset) {
+        if (offset != 0 && pdfPages.size() > (offset + 2)) {
             return;
         }
         requestInProgress = true;
         String urlParams[] = {
                 "mode=read",
                 "book_id=" + currentBook.id,
-                "user_id=1",
-                "offset=" + String.valueOf(offset)
+                "user_email=" + (currentUser == null ? "" : currentUser.email),
         };
-        String preparedURL = Utils.getPreparedApiUrl(urlParams);
-        new HttpRequest(this).execute(preparedURL);
+        String preparedURL = Utils.getPreparedApiUrl(Utils.READ_BOOK, urlParams);
+        Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL);
+    }
 
-        Snackbar.make(findViewById(R.id.main_content), preparedURL, Snackbar.LENGTH_LONG)
-                .setAction("Action", null).show();
+    /**
+     * Save current reading progress
+     *
+     * @param pageNumber Integer
+     */
+    public void saveProgress(Integer pageNumber) {
+        if (currentUser == null || currentUser.email.length() == 0) {
+            return;
+        }
+        requestInProgress = true;
+        String urlParams[] = {
+                "book_id=" + currentBook.id,
+                "page_no=" + pageNumber,
+                "user_email=" + currentUser.email,
+        };
+        String preparedURL = Utils.getPreparedApiUrl(Utils.SAVE_PROGRESS, urlParams);
+        Utils.newHttpRequest(this, Utils.SAVE_PROGRESS, "GET", preparedURL);
     }
 
     /**
@@ -157,7 +193,6 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
          * The fragment argument representing the section number for this
          * fragment.
          */
-        private static Integer CURRENT_SECTION = 1;
         private static final String ARG_SECTION_NUMBER = "section_number";
 
         public PlaceholderFragment() {
@@ -168,7 +203,6 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
          * number.
          */
         public static PlaceholderFragment newInstance(int sectionNumber) {
-            CURRENT_SECTION = sectionNumber;
             PlaceholderFragment fragment = new PlaceholderFragment();
             Bundle args = new Bundle();
             args.putInt(ARG_SECTION_NUMBER, sectionNumber);

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/listview_items_parent"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:layout_alignParentEnd="true"
     android:orientation="horizontal">
 
     <ImageView
@@ -16,11 +17,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
+        android:layout_toRightOf="@id/imageview_cover_art"
         android:padding="20dp">
 
         <TextView
             android:id="@+id/textview_book_name"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColor="@color/colorFont"
             android:textSize="18dp"
@@ -28,10 +30,10 @@
 
         <TextView
             android:id="@+id/textview_book_author"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="5dp"
             android:textColor="@color/colorFont"
             android:textSize="14dp" />
     </LinearLayout>
-</LinearLayout>
+</RelativeLayout>

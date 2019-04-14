@@ -25,12 +25,14 @@ import java.util.LinkedList;
 
 public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostExecute {
 
+    private static ArrayList<byte[]> pdfPages = new ArrayList<>();
     private Book currentBook = null;
     private User currentUser = null;
+    private Integer safetyGap = 3;  // no of pages
     private Integer currentPageIndex = 0;
-    private Integer prevSwipePosition = 0;
-    private static ArrayList<byte[]> pdfPages = new ArrayList<>();
+    private boolean firstLoad = true;
     private boolean requestInProgress = false;
+    private Integer currentPageIndexRetreiving = 0;
     private LinkedList<HttpRequest> requestQueue = new LinkedList<>();
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
@@ -61,10 +63,18 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
         currentBook = (Book) intent.getSerializableExtra("BOOK");
         toolbar.setTitle(currentBook.name);
 
-        currentUser = (User) intent.getSerializableExtra("USER");
+        for (int i = 0; i < Integer.valueOf(currentBook.no_of_pages); ++i) {
+            byte[] temp = {};
+            pdfPages.add(temp);
+        }
 
-        currentPageIndex = 0;
-        managePdf(currentPageIndex);
+        currentUser = (User) intent.getSerializableExtra("USER");
+        currentPageIndex = intent.getIntExtra("PAGE_NO", 1);
+        if (currentPageIndex > 0) {
+            currentPageIndex--;
+        }
+        // set pager data and position
+        managePdf(true);
     }
 
     @Override
@@ -81,13 +91,13 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
         try {
             JSONObject jObj = new JSONObject(result);
             int bookPages = jObj.getInt("count");
-            currentPageIndex = jObj.getInt("page_no") - 1;
             JSONObject pdfContents = jObj.getJSONObject("content");
             JSONArray pdfChuck = pdfContents.getJSONArray(currentBook.id);
             for (int i = 0; i < pdfChuck.length(); ++i) {
                 String base64Content = pdfChuck.getJSONObject(i).getString("pageData");
+                Integer pageIndex = Integer.valueOf(pdfChuck.getJSONObject(i).getString("pageIndex"));
                 byte[] pageData = Base64.decode(base64Content, Base64.DEFAULT);
-                pdfPages.add(pageData);
+                pdfPages.set(pageIndex, pageData);
             }
         } catch (JSONException e) {
             Log.e("RA::JSONException", e.getMessage());
@@ -101,46 +111,51 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
             // Set up the ViewPager with the sections adapter.
             mViewPager = findViewById(R.id.container);
             mViewPager.setAdapter(mSectionsPagerAdapter);
+            mViewPager.setCurrentItem(currentPageIndex, true);
 
             mViewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
                 public void onPageSelected(int position) {
-                    if (position > prevSwipePosition) {
+                    if (position > currentPageIndex) {
                         // only if going to next page
-                        handlePageChange(position);
-                        prevSwipePosition = position;
+                        handlePageChangeNext();
+                    } else {
+                        handlePageChangePrev();
                     }
                 }
             });
         } else {
             mSectionsPagerAdapter.notifyDataSetChanged();
         }
+        firstLoad = false;
     }
 
     public void handleSaveProgressApiResponse(String result) {
 
     }
 
-    public void handlePageChange(Integer position) {
-        currentPageIndex++; // swiped right so update page index we are pointing to
-        managePdf(position);
+    public void handlePageChangeNext() {
+        currentPageIndex++; // swiped right to update page index we are pointing to
+        managePdf(true);
+    }
+
+    public void handlePageChangePrev() {
+        currentPageIndex--;
+        managePdf(false);
     }
 
     /**
-     * Handles pdf progress saving and pdf navigation
-     * When called for the first time during activity creation 'position' will be 0 as we need to get
-     * the initial pdf page set. At this time 'currentPageIndex' will also be 0 because it is updated
-     * when initial pdf page set is retrieved in 'getPdfChunk' method and that synchronizes the
-     * 'currentPageIndex' with user's saved progress.
-     *
-     * @param position
+     * Handles pdf progress saving and pdf forward navigation
+     * When called for the first time during activity creation 'position' will be 0 and it will force
+     * to get the initial pdf page set. At this time 'currentPageIndex' will also be 0 because it is
+     * updated when initial pdf page set is retrieved in 'getPdfChunk' method and that synchronizes
+     * the 'currentPageIndex' with user's saved progress.
      */
-    public void managePdf(Integer position) {
-        if (requestInProgress) {
-            enQueueRequest();
-        } else {
-            getPdfChunk(position);  // Check if close to completing current set of pages and get more
+    public void managePdf(Boolean upcoming) {
+        if (upcoming) {
+            // only saving progression
             saveProgress(currentPageIndex + 1); // +1 because we save page number, not index
         }
+        getPdfPage(currentPageIndex, upcoming);  // Check if close to completing current set of pages then get more
     }
 
     public void enQueueRequest() {
@@ -150,10 +165,19 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
     /**
      * Check if close to completing current set of pages and get more
      *
-     * @param offset Integer
+     * @param pageNo Integer
      */
-    public void getPdfChunk(Integer offset) {
-        if (offset != 0 && pdfPages.size() > (offset + 2)) {
+    public void getPdfPage(Integer pageNo, Boolean upcoming) {
+        if (upcoming) {
+            currentPageIndexRetreiving = pageNo + safetyGap;
+        } else {
+            currentPageIndexRetreiving = pageNo - safetyGap;
+        }
+        if (currentPageIndexRetreiving >= Integer.valueOf(currentBook.no_of_pages)) {
+            // point to last page
+            currentPageIndexRetreiving = Integer.valueOf(currentBook.no_of_pages) - 1;
+        }
+        if (currentPageIndexRetreiving < 0 || pdfPages.get(currentPageIndexRetreiving).length != 0) {
             return;
         }
         requestInProgress = true;
@@ -161,9 +185,12 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
                 "mode=read",
                 "book_id=" + currentBook.id,
                 "user_email=" + (currentUser == null ? "" : currentUser.email),
+                "first_load=" + String.valueOf(firstLoad),
+                "gap_to_safety=" + String.valueOf(safetyGap),
+                "retrieve_page=" + String.valueOf(currentPageIndexRetreiving + 1),
         };
         String preparedURL = Utils.getPreparedApiUrl(Utils.READ_BOOK, urlParams);
-        Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL);
+        Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL, getBaseContext(), findViewById(R.id.reader_activity_main_content));
     }
 
     /**
@@ -182,7 +209,39 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
                 "user_email=" + currentUser.email,
         };
         String preparedURL = Utils.getPreparedApiUrl(Utils.SAVE_PROGRESS, urlParams);
-        Utils.newHttpRequest(this, Utils.SAVE_PROGRESS, "GET", preparedURL);
+        Utils.newHttpRequest(this, Utils.SAVE_PROGRESS, "GET", preparedURL, getBaseContext(), findViewById(R.id.reader_activity_main_content));
+    }
+
+    @Override
+    public void onBackPressed() {
+        Intent intent = new Intent();
+        intent.putExtra("PAGE_NO", currentPageIndex + 1);
+        setResult(RESULT_OK, intent);
+        finish();
+    }
+
+    /**
+     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
+     * one of the sections/tabs/pages.
+     */
+    public class SectionsPagerAdapter extends FragmentPagerAdapter {
+
+        public SectionsPagerAdapter(FragmentManager fm) {
+            super(fm);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            // getItem is called to instantiate the fragment for the given page.
+            // Return a PlaceholderFragment (defined as a static inner class below).
+            return PlaceholderFragment.newInstance(position + 1);
+        }
+
+        @Override
+        public int getCount() {
+            // Number of pages to show
+            return pdfPages.size();
+        }
     }
 
     /**
@@ -216,36 +275,12 @@ public class ReaderActivity extends AppCompatActivity implements AsyncTaskPostEx
             View rootView = inflater.inflate(R.layout.fragment_reader, container, false);
             int sectionNumber = getArguments().getInt(ARG_SECTION_NUMBER);
 
-            if (pdfPages.size() > 0 && pdfPages.size() > (sectionNumber - 1)) {
+            if (pdfPages.get(sectionNumber - 1).length > 0) {
                 PDFView pdfView = rootView.findViewById(R.id.pdfView);
                 pdfView.fromBytes(pdfPages.get(sectionNumber - 1)).enableAnnotationRendering(true).load();
             }
 
             return rootView;
-        }
-    }
-
-    /**
-     * A {@link FragmentPagerAdapter} that returns a fragment corresponding to
-     * one of the sections/tabs/pages.
-     */
-    public class SectionsPagerAdapter extends FragmentPagerAdapter {
-
-        public SectionsPagerAdapter(FragmentManager fm) {
-            super(fm);
-        }
-
-        @Override
-        public Fragment getItem(int position) {
-            // getItem is called to instantiate the fragment for the given page.
-            // Return a PlaceholderFragment (defined as a static inner class below).
-            return PlaceholderFragment.newInstance(position + 1);
-        }
-
-        @Override
-        public int getCount() {
-            // Number of pages to show
-            return pdfPages.size();
         }
     }
 }

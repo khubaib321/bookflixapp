@@ -1,5 +1,6 @@
 package com.example.kkrb0;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.BottomNavigationView;
@@ -20,16 +21,18 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
     private Integer pageNumber = 0;
     private Book currentBook = null;
     private User currentUser = null;
-    private TextView textView = null;
-    private Button readButton = null;
 
     private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener
             = item -> {
         switch (item.getItemId()) {
             case R.id.navigation_home:
-                finish();
+                navigateUpTo(new Intent(getBaseContext(), MainActivity.class));
                 return true;
             case R.id.navigation_search:
+                Intent intent = new Intent(this, SearchActivity.class);
+                intent.putExtra("USER", currentUser);
+                intent.putExtra("PAGE_BO", pageNumber);
+                startActivityForResult(intent, 1);
                 return true;
             case R.id.navigation_settings:
                 return true;
@@ -52,7 +55,7 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
                 "user_email=" + (currentUser == null ? "" : currentUser.email),
         };
         String preparedURL = Utils.getPreparedApiUrl(Utils.READ_BOOK, urlParams);
-        Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL);
+        Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL, getBaseContext(), findViewById(R.id.description_activity_main_content));
 
         BottomNavigationView navigation = findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
@@ -67,6 +70,7 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
         Intent intent = new Intent(this, ReaderActivity.class);
         intent.putExtra("BOOK", currentBook);
         intent.putExtra("USER", currentUser);
+        intent.putExtra("PAGE_NO", pageNumber);
         startActivity(intent);
     }
 
@@ -79,6 +83,7 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
                 .load(Utils.geteBookImageUrl(currentBook.cover))
                 .into((ImageView) findViewById(R.id.book_cover));
 
+        TextView textView;
         textView = findViewById(R.id.name_text);
         textView.setText(currentBook.name);
 
@@ -100,7 +105,7 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
         textView = findViewById(R.id.description_text);
         textView.setText(currentBook.description);
 
-        readButton = findViewById(R.id.read_button);
+        Button readButton = findViewById(R.id.read_button);
         if (pageNumber == 0) {
             readButton.setText("START READING");
         } else {
@@ -128,5 +133,39 @@ public class DescriptionActivity extends AppCompatActivity implements AsyncTaskP
             e.printStackTrace();
         }
         setFieldsData();
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        // Save UI state changes to the savedInstanceState.
+        // This bundle will be passed to onCreate if the process is
+        // killed and restarted.
+        savedInstanceState.putInt("Page", pageNumber);
+        savedInstanceState.putSerializable("Book", currentBook);
+        savedInstanceState.putSerializable("User", currentUser);
+        // etc.
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        // Restore UI state from the savedInstanceState.
+        // This bundle has also been passed to onCreate.
+        pageNumber = savedInstanceState.getInt("Page");
+        currentBook = (Book) savedInstanceState.getSerializable("Book");
+        currentUser = (User) savedInstanceState.getSerializable("User");
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == 1) {
+            if (resultCode == Activity.RESULT_OK) {
+                pageNumber = Integer.valueOf(data.getStringExtra("PAGE_NO"));
+                Button readButton = findViewById(R.id.read_button);
+                readButton.setText("CONTINUE READING (Page " + String.valueOf(pageNumber) + ")");
+            }
+        }
     }
 }

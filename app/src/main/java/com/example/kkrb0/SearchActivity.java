@@ -27,7 +27,7 @@ public class SearchActivity extends AppCompatActivity implements SearchView.OnQu
             = item -> {
         switch (item.getItemId()) {
             case R.id.navigation_home:
-                finish();
+                navigateUpTo(new Intent(getBaseContext(), MainActivity.class));
                 return true;
             case R.id.navigation_search:
                 return true;
@@ -80,7 +80,7 @@ public class SearchActivity extends AppCompatActivity implements SearchView.OnQu
                 "text=" + newText,
         };
         String preparedURL = Utils.getPreparedApiUrl(Utils.SEARCH_BOOK, urlParams);
-        Utils.newHttpRequest(this, Utils.SEARCH_BOOK, "GET", preparedURL);
+        Utils.newHttpRequest(this, Utils.SEARCH_BOOK, "GET", preparedURL, getBaseContext(), findViewById(R.id.search_activity_main_content));
         return true;
     }
 

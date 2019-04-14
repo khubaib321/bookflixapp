@@ -1,13 +1,16 @@
 package com.example.kkrb0;
 
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.design.widget.BottomNavigationView;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.Snackbar;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -39,6 +42,8 @@ public class MainActivity extends AppCompatActivity
     private User currentUser = null;
     private GoogleSignInClient mGoogleSignInClient;
     private ArrayList<Book> books = new ArrayList<>();
+    private BooksAdapter booksAdapter;
+    private Integer GRIDVIEW_COLUMNS = 2;
 
     private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener
             = item -> {
@@ -86,7 +91,9 @@ public class MainActivity extends AppCompatActivity
         navigationView.setNavigationItemSelectedListener(this);
 
         GridView gridview = findViewById(R.id.gridview);
-        gridview.setAdapter(new BooksAdapter(this, books, false));
+        gridview.setNumColumns(GRIDVIEW_COLUMNS);
+        booksAdapter = new BooksAdapter(this, books, false);
+        gridview.setAdapter(booksAdapter);
         gridview.setOnItemClickListener((parent, view, position, id) -> {
             Intent intent = new Intent(this, DescriptionActivity.class);
             intent.putExtra("BOOK", books.get(position));
@@ -97,14 +104,22 @@ public class MainActivity extends AppCompatActivity
         BottomNavigationView navigation = findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
 
+        fetchBooks();
+
+        setNavigationHeaderData(getResources().getString(R.string.app_name_offical), "by kitabkhana.com.pk", null);
+        initiateGoogleSignIn();
+    }
+
+    public void fetchBooks() {
         String urlParams[] = {
                 "mode=list"
         };
         String preparedURL = Utils.getPreparedApiUrl(Utils.READ_BOOK, urlParams);
-        Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL);
+        if (!Utils.newHttpRequest(this, Utils.READ_BOOK, "GET", preparedURL, getBaseContext(), findViewById(R.id.main_activity_main_content))) {
+            // to make sure swipe layout is notified
+            onTaskCompleted("", 0);
+        }
 
-        setNavigationHeaderData(getResources().getString(R.string.app_name_offical), "by kitabkhana.com.pk", null);
-        initiateGoogleSignIn();
     }
 
     @Override
@@ -112,6 +127,14 @@ public class MainActivity extends AppCompatActivity
         super.onStart();
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
         postSignIn(account, false);
+
+        SwipeRefreshLayout swipeRefreshLayout = findViewById(R.id.gridview_swipe_refresh);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            swipeRefreshLayout.setColorSchemeColors(getColor(R.color.colorPrimaryDark), getColor(R.color.colorAccent), getColor(R.color.colorPrimary));
+        }
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            fetchBooks();
+        });
     }
 
     @Override
@@ -151,11 +174,14 @@ public class MainActivity extends AppCompatActivity
         } else if (requestType == Utils.USER_LOGIN) {
             handleUserLoginApiResponse(result);
         }
+        SwipeRefreshLayout swipeRefreshLayout = findViewById(R.id.gridview_swipe_refresh);
+        swipeRefreshLayout.setRefreshing(false);
     }
 
     public void handleReadBookApiResponse(String result) {
 
         try {
+            books.clear();
             JSONObject bookInfo = new JSONObject(result);
             JSONArray foundBooks = bookInfo.getJSONArray("body");
             for (int i = 0; i < foundBooks.length(); ++i) {
@@ -167,7 +193,7 @@ public class MainActivity extends AppCompatActivity
                 b.author = book.getString("author");
                 books.add(b);
             }
-
+            booksAdapter.refreshList(books);
         } catch (JSONException e) {
             Log.e("MA::JSONException", e.getMessage());
         }
@@ -232,7 +258,7 @@ public class MainActivity extends AppCompatActivity
                     "phone2=0",
             };
             String preparedURL = Utils.getPreparedApiUrl(Utils.USER_LOGIN, urlParams);
-            Utils.newHttpRequest(this, Utils.USER_LOGIN, "GET", preparedURL);
+            Utils.newHttpRequest(this, Utils.USER_LOGIN, "GET", preparedURL, getBaseContext(), findViewById(R.id.main_activity_main_content));
             Snackbar.make(findViewById(R.id.main_activity_main_content), "Signed in as: " + account.getDisplayName() + " (" + account.getEmail() + ").", Snackbar.LENGTH_SHORT)
                     .setAction("Action", null).show();
         }
@@ -278,5 +304,39 @@ public class MainActivity extends AppCompatActivity
                 .fitCenter()
                 .into((ImageView) headerView.findViewById(R.id.nav_header_photo));
 
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        // Save UI state changes to the savedInstanceState.
+        // This bundle will be passed to onCreate if the process is
+        // killed and restarted.
+        savedInstanceState.putSerializable("Books", books);
+        savedInstanceState.putSerializable("User", currentUser);
+        // etc.
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        // Restore UI state from the savedInstanceState.
+        // This bundle has also been passed to onCreate.
+        currentUser = (User) savedInstanceState.getSerializable("User");
+        books = (ArrayList<Book>) savedInstanceState.getSerializable("Books");
+        booksAdapter.refreshList(books);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        int newOrientation = newConfig.orientation;
+
+        if (newOrientation == Configuration.ORIENTATION_LANDSCAPE) {
+            GRIDVIEW_COLUMNS = 3;
+        } else {
+            GRIDVIEW_COLUMNS = 2;
+        }
     }
 }

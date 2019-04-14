@@ -9,6 +9,7 @@ import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
@@ -72,7 +73,7 @@ public class BooksAdapter extends BaseAdapter implements Filterable {
             // different settings if list view
             width = 320;
             height = 380;
-            imageView.setLayoutParams(new LinearLayout.LayoutParams(width, height));
+            imageView.setLayoutParams(new RelativeLayout.LayoutParams(width, height));
         }
 
         Glide
